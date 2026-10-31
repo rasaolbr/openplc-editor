@@ -1,2 +1,2 @@
 export { createModalSlice } from './slice'
-export type { ModalActions, ModalSlice, ModalsState, ModalTypes } from './types'
+export type { ConfirmOverwriteProjectModalData, ModalActions, ModalSlice, ModalsState, ModalTypes } from './types'

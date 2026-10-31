@@ -30,6 +30,8 @@ import type {
   RawProjectFile,
   RawProjectFiles,
   RenamePouParams,
+  SaveAsPathPick,
+  SaveAsScanRequest,
   SaveResult,
   UploadProjectParams,
   UploadProjectResult,
@@ -481,6 +483,10 @@ export function createEditorProjectAdapter(
 
     async pickPath(): Promise<{ success: boolean; path?: string; error?: { title: string; description: string } }> {
       return window.bridge.pathPicker()
+    },
+
+    async pickSaveAsPath(scan: SaveAsScanRequest): Promise<SaveAsPathPick> {
+      return window.bridge.saveAsPathPicker(scan)
     },
 
     async listCloudFolders(): Promise<CloudFoldersResult> {

@@ -22,6 +22,7 @@ import {
 import { ConfirmDeleteProjectModal } from '../_organisms/modals/confirm-delete-project-modal'
 import { ConfirmDeviceSwitchModal } from '../_organisms/modals/confirm-device-switch-modal'
 import { ConfirmInstallLibrariesModal } from '../_organisms/modals/confirm-install-libraries-modal'
+import { ConfirmOverwriteProjectModal } from '../_organisms/modals/confirm-overwrite-project-modal'
 import { ConfirmPlcopenImportModal } from '../_organisms/modals/confirm-plcopen-import-modal'
 import { CreateGraphicalVariableModal } from '../_organisms/modals/create-graphical-variable-modal'
 import { DebuggerIpInputModal } from '../_organisms/modals/debugger-ip-input-modal'
@@ -172,6 +173,7 @@ const AppLayout = ({ children, ...rest }: AppLayoutProps): ReactNode => {
           {modals?.['confirm-plcopen-import']?.open === true && (
             <ConfirmPlcopenImportModal isOpen={modals['confirm-plcopen-import'].open} />
           )}
+          {modals?.['confirm-overwrite-project']?.open === true && <ConfirmOverwriteProjectModal />}
           {modals?.['create-graphical-variable']?.open === true && (
             <CreateGraphicalVariableModal
               isOpen={modals['create-graphical-variable'].open}

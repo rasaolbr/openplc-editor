@@ -143,6 +143,13 @@ beforeEach(() => {
     renamePouFile: jest.fn().mockResolvedValue(mockPouResponse),
     pathPicker: jest.fn().mockResolvedValue({ success: true, path: '/picked/path' }),
     openPathPicker: jest.fn().mockResolvedValue({ success: true, path: '/picked/path' }),
+    saveAsPathPicker: jest.fn().mockResolvedValue({
+      success: true,
+      path: '/picked/path',
+      entries: ['project.json', 'pous'],
+      files: { 'project.json': '{}' },
+      listed: ['pous/programs/main.st'],
+    }),
     retrieveRecent: jest.fn().mockResolvedValue(mockRecentProjects),
     removeProjectFromRecent: jest.fn().mockResolvedValue({ success: true }),
     trackRecentProject: jest.fn().mockResolvedValue(undefined),
@@ -654,6 +661,22 @@ describe('createEditorProjectAdapter', () => {
 
       expect(window.bridge.pathPicker).toHaveBeenCalledTimes(1)
       expect(result).toEqual({ success: true, path: '/picked/path' })
+    })
+  })
+
+  describe('pickSaveAsPath', () => {
+    it('delegates to window.bridge.saveAsPathPicker and passes the answer through verbatim', async () => {
+      const scan = { readFiles: ['project.json'], listDirectories: ['pous/programs'] }
+      const result = await adapter.pickSaveAsPath?.(scan)
+
+      expect(window.bridge.saveAsPathPicker).toHaveBeenCalledWith(scan)
+      expect(result).toEqual({
+        success: true,
+        path: '/picked/path',
+        entries: ['project.json', 'pous'],
+        files: { 'project.json': '{}' },
+        listed: ['pous/programs/main.st'],
+      })
     })
   })
 

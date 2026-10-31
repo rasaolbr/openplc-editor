@@ -1,6 +1,7 @@
+import type { SaveAsPathPick, SaveAsScanRequest } from '@root/middleware/shared/ports/project-port'
 import { BrowserWindow, dialog } from 'electron'
-import { promises } from 'fs'
-import { join } from 'path'
+import { type Dirent, promises } from 'fs'
+import { join, resolve, sep } from 'path'
 
 import { isEmptyDir } from './is-empty-dir'
 
@@ -37,6 +38,80 @@ const getProjectPath = async (serviceManager: GetProjectPathProps) => {
     success: true,
     path: filePath,
   }
+}
+
+/** `relativePath` resolved under `root`, or `null` when it would leave it. */
+const resolveInside = (root: string, relativePath: string): string | null => {
+  const base = resolve(root)
+  const target = resolve(base, ...relativePath.split('/'))
+  return target.startsWith(base + sep) ? target : null
+}
+
+/** Regular files under `dir`, as `/`-separated paths prefixed with `prefix`. Links are not followed. */
+const listFilesRecursive = async (dir: string, prefix: string): Promise<string[]> => {
+  let entries: Dirent[]
+  try {
+    entries = await promises.readdir(dir, { withFileTypes: true })
+  } catch {
+    return []
+  }
+  const files: string[] = []
+  for (const entry of entries) {
+    const relative = `${prefix}/${entry.name}`
+    if (entry.isDirectory()) files.push(...(await listFilesRecursive(join(dir, entry.name), relative)))
+    else if (entry.isFile()) files.push(relative)
+  }
+  return files
+}
+
+/**
+ * Folder picker for Save As. Accepts any folder and reports what is in it, as `scan` asks; whether it may be written
+ * into is decided by the caller.
+ */
+const getSaveAsProjectPath = async (
+  serviceManager: GetProjectPathProps,
+  scan: SaveAsScanRequest,
+): Promise<SaveAsPathPick> => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(serviceManager, {
+    title: 'Choose a folder to save the project',
+    properties: ['openDirectory', 'createDirectory'],
+  })
+  const [filePath] = filePaths
+  if (canceled || !filePath) {
+    return { success: false, cancelled: true }
+  }
+
+  let entries: string[]
+  try {
+    entries = await promises.readdir(filePath)
+  } catch {
+    return {
+      success: false,
+      error: {
+        title: 'Folder could not be read',
+        description: 'The selected folder could not be read. Please choose another folder.',
+      },
+    }
+  }
+
+  const files: Record<string, string> = {}
+  for (const relativePath of scan.readFiles) {
+    const target = resolveInside(filePath, relativePath)
+    if (!target) continue
+    try {
+      files[relativePath] = await promises.readFile(target, 'utf-8')
+    } catch {
+      // Absent or unreadable: left out of the answer.
+    }
+  }
+
+  const listed: string[] = []
+  for (const relativeDir of scan.listDirectories) {
+    const target = resolveInside(filePath, relativeDir)
+    if (target) listed.push(...(await listFilesRecursive(target, relativeDir)))
+  }
+
+  return { success: true, path: filePath, entries, files, listed }
 }
 
 const getOpenProjectPath = async (serviceManager: GetProjectPathProps) => {
@@ -158,4 +233,11 @@ const getPdfExportSavePath = async (
   }
 }
 
-export { getOpenProjectPath, getPdfExportSavePath, getPlcopenExportSavePath, getPlcopenImportFilePath, getProjectPath }
+export {
+  getOpenProjectPath,
+  getPdfExportSavePath,
+  getPlcopenExportSavePath,
+  getPlcopenImportFilePath,
+  getProjectPath,
+  getSaveAsProjectPath,
+}

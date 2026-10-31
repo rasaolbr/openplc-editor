@@ -51,6 +51,7 @@ jest.mock('../../../backend/editor/services', () => ({
 jest.mock('../../../backend/editor/utils', () => ({
   getOpenProjectPath: jest.fn(),
   getProjectPath: jest.fn(),
+  getSaveAsProjectPath: jest.fn(),
 }))
 
 jest.mock('../../../backend/shared/simulator/simulator-module', () => ({

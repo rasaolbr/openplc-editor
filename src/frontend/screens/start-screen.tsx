@@ -1,7 +1,14 @@
 import * as PrimitiveDropdown from '@radix-ui/react-dropdown-menu'
 import { useEffect, useState } from 'react'
 
-import { useCapabilities, useDevice, useProject, useSystem, useWindow } from '../../middleware/shared/providers'
+import {
+  useCapabilities,
+  useDevice,
+  useProject,
+  useRuntime,
+  useSystem,
+  useWindow,
+} from '../../middleware/shared/providers'
 import { DocumentationIcon } from '../assets/icons/interface/Documentation'
 import { FolderIcon } from '../assets/icons/interface/Folder'
 import { PlusIcon } from '../assets/icons/interface/Plus'
@@ -31,6 +38,7 @@ const StartScreen = () => {
   const projectPort = useProject()
   const device = useDevice()
   const windowPort = useWindow()
+  const runtime = useRuntime()
 
   const {
     workspaceActions: { setRecent },
@@ -44,6 +52,9 @@ const StartScreen = () => {
     capabilities.hasEdgeAccount &&
     projectPort.listCloudFolders !== undefined &&
     projectPort.listCloudProjectsInFolder !== undefined
+
+  // Optional on the port: a platform that cannot list devices keeps the entry, disabled.
+  const canRetrieveFromPlc = runtime.listRetrievableDevices !== undefined
 
   const handleCreateProject = () => {
     openModal('create-project', null)
@@ -148,6 +159,14 @@ const StartScreen = () => {
                   className='cursor-pointer select-none rounded px-3 py-2 outline-none hover:bg-neutral-50 focus:bg-neutral-100 data-[disabled]:cursor-default data-[disabled]:opacity-50 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800'
                 >
                   Autonomy Edge project…
+                </PrimitiveDropdown.Item>
+                <PrimitiveDropdown.Item
+                  disabled={!canRetrieveFromPlc}
+                  onSelect={() => openModal('retrieve-project', null)}
+                  data-testid='start-open-retrieve-project'
+                  className='cursor-pointer select-none rounded px-3 py-2 outline-none hover:bg-neutral-50 focus:bg-neutral-100 data-[disabled]:cursor-default data-[disabled]:opacity-50 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800'
+                >
+                  Retrieve from PLC…
                 </PrimitiveDropdown.Item>
               </PrimitiveDropdown.Content>
             </PrimitiveDropdown.Root>

@@ -264,6 +264,37 @@ export interface UploadProjectParams {
   visibility: 'public' | 'private'
 }
 
+/** What Save As asks the platform to look at inside the folder the user picks. Paths are relative, `/`-separated. */
+export interface SaveAsScanRequest {
+  /** Read as UTF-8 text when present; absent files are left out of the answer. */
+  readFiles: string[]
+  /** Listed recursively, regular files only. */
+  listDirectories: string[]
+}
+
+export const SaveAsScanRequestSchema = z.object({
+  readFiles: z.array(z.string()),
+  listDirectories: z.array(z.string()),
+})
+
+/**
+ * A folder chosen as a Save As destination and what is already in it. Unlike `pickPath`, a folder that is not empty
+ * is a valid answer: whether it may be written into is decided by the caller.
+ */
+export type SaveAsPathPick =
+  | {
+      success: true
+      path: string
+      /** Names directly inside the folder. */
+      entries: string[]
+      /** Contents of the requested files that exist, keyed by the requested path. */
+      files: Record<string, string>
+      /** Every file under the requested directories, relative to the folder, `/`-separated. */
+      listed: string[]
+    }
+  | { success: false; cancelled: true }
+  | { success: false; error: { title: string; description: string } }
+
 export interface ProjectPort {
   /** Optional — only a platform with both local projects and Edge access has this. */
   listCloudFolders?(): Promise<CloudFoldersResult>
@@ -297,6 +328,9 @@ export interface ProjectPort {
   renameProject(projectId: string, newName: string): Promise<{ success: boolean; name?: string; error?: string }>
 
   pickPath(): Promise<{ success: boolean; path?: string; error?: { title: string; description: string } }>
+
+  /** Save As destination picker; optional, Save As falls back to `pickPath` without it. */
+  pickSaveAsPath?(scan: SaveAsScanRequest): Promise<SaveAsPathPick>
 
   /** Get list of recently opened projects. */
   getRecentProjects(): Promise<RecentProject[]>
