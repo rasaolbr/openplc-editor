@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 
 import { useCapabilities, useTheme, useWindow } from '../../../../../middleware/shared/providers'
 import { i18n } from '../../../../locales/i18n'
+import { changeEditorZoom } from '../../../../services/editor-zoom'
 import { DIAGNOSTICS_TAB_NAME, openDiagnosticsTab } from '../../../../services/io-diagnostics/open-tab'
 import { requestAppRefresh } from '../../../../services/refresh-app'
 import { useOpenPLCStore, useOpenPLCStoreApi } from '../../../../store'
@@ -72,11 +73,13 @@ export const DisplayMenu = () => {
             <span>{i18n.t('menu:display.submenu.clearErrors')}</span>
           </MenuPrimitive.Item>
           <MenuPrimitive.Separator className={SEPARATOR} />
-          <MenuPrimitive.Item className={ITEM} disabled>
+          <MenuPrimitive.Item className={ITEM} onClick={() => changeEditorZoom(store, 'in')}>
             <span>{i18n.t('menu:display.submenu.zoomIn')}</span>
+            <span className={ACCELERATOR}>{'Ctrl + ='}</span>
           </MenuPrimitive.Item>
-          <MenuPrimitive.Item className={ITEM} disabled>
+          <MenuPrimitive.Item className={ITEM} onClick={() => changeEditorZoom(store, 'out')}>
             <span>{i18n.t('menu:display.submenu.zoomOut')}</span>
+            <span className={ACCELERATOR}>{'Ctrl + -'}</span>
           </MenuPrimitive.Item>
           <MenuPrimitive.Item className={ITEM} onClick={switchPerspective}>
             <span>{i18n.t('menu:display.submenu.switchPerspective')}</span>

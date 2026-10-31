@@ -10,6 +10,7 @@ import { useAI, useCapabilities, useEdgeAccountPort, useProject } from '../../..
 import { useDebugBoolValuesMap, useDebugNonBoolValuesMap } from '../../../../../hooks/use-debug-value'
 import { registerAIInlineCompletions } from '../../../../../services/ai/inline-completions'
 import { getCppMemberCompletions, projectTypeNamePredicate } from '../../../../../services/cpp-scope'
+import { changeEditorZoom } from '../../../../../services/editor-zoom'
 import { executeSaveActiveFile, executeSaveProject } from '../../../../../services/save-actions'
 import { pouUri, splitExpression } from '../../../../../services/st-lsp'
 import { useOpenPLCStore, useOpenPLCStoreApi } from '../../../../../store'
@@ -35,6 +36,7 @@ import { parsePouToStText } from './drag-and-drop/st'
 import { runWithoutDirtying } from './model-sync-guard'
 import { cleanupPythonLSP, initPythonLSP, setupPythonLSPForEditor, updatePythonLspContext } from './python-lsp'
 import { applyThemeNow, ensureOpenplcThemes } from './theme-utils'
+import { editorZoomKeybindings, installEditorZoomKeybindings } from './zoom-keybindings'
 
 type monacoEditorProps = {
   path: string
@@ -121,6 +123,7 @@ const MonacoEditor = (props: monacoEditorProps): ReturnType<typeof PrimitiveEdit
   const edgeAccount = useEdgeAccountPort()
   const projectPort = useProject()
   const store = useOpenPLCStoreApi()
+  const editorFontSize = useOpenPLCStore((s) => s.workspace.editorFontSize)
 
   const {
     editor,
@@ -927,6 +930,10 @@ const MonacoEditor = (props: monacoEditorProps): ReturnType<typeof PrimitiveEdit
       )
     }
 
+    installEditorZoomKeybindings(editorInstance, editorZoomKeybindings(monacoInstance), (direction) => {
+      changeEditorZoom(store, direction)
+    })
+
     // Tab commits visible AI ghost text; inert while AI is off (context key, see the effect below).
     coexistenceRef.current = installAiLspCoexistenceKeybindings(editorInstance, monacoInstance.KeyCode.Tab)
     coexistenceRef.current.setActive(inlineCompletionsActive)
@@ -1168,9 +1175,9 @@ void loop()
     detectIndentation: false,
     // Let the LSP dropdown auto-open in both modes; the user accepts it with Enter/arrows.
     quickSuggestions: undefined,
-    // Pinned for cross-platform parity with the variables-code-editor; Monaco's default
-    // font size is platform-dependent (12 on macOS, 14 elsewhere).
-    fontSize: 12,
+    // Explicit (not Monaco's platform-dependent default) and user-zoomable; shared by every
+    // textual code editor through the workspace slice.
+    fontSize: editorFontSize,
     // Monaco's standalone themes default this to false, silently dropping the STruC++ LSP's
     // semantic-tokens response; forcing it on unblocks ST variable/type coloring.
     'semanticHighlighting.enabled': true,
