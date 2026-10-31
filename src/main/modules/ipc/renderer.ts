@@ -40,6 +40,8 @@ import type {
   CloudFoldersResult,
   CloudProjectsResult,
   RawProjectFiles,
+  SaveAsPathPick,
+  SaveAsScanRequest,
   UploadProjectParams,
   UploadProjectResult,
   WriteProjectFiles,
@@ -138,6 +140,8 @@ const rendererProcessBridge = {
   openRecentAccelerator: (callback: IpcRendererCallbacks) => subscribe('project:open-recent-accelerator', callback),
   pathPicker: (): Promise<{ success: boolean; error?: { title: string; description: string }; path?: string }> =>
     ipcRenderer.invoke('project:path-picker'),
+  saveAsPathPicker: (scan: SaveAsScanRequest): Promise<SaveAsPathPick> =>
+    ipcRenderer.invoke('project:save-as-path-picker', scan),
   openPathPicker: (): Promise<{ success: boolean; error?: { title: string; description: string }; path?: string }> =>
     ipcRenderer.invoke('project:open-path-picker'),
   readProjectFiles: (projectPath: string): Promise<unknown> => ipcRenderer.invoke('project:read-files', projectPath),

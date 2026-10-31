@@ -45,6 +45,9 @@ export type ModalTypes =
    *  item. Acts on whatever project is currently open — no targeted
    *  data payload (unlike `confirm-delete-project`). */
   | 'confirm-plcopen-import'
+  /** Save As into a folder that already holds an OpenPLC project. Data shape:
+   *  `ConfirmOverwriteProjectModalData`; `onResolve` answers the waiting Save As. */
+  | 'confirm-overwrite-project'
   /** "Add variable" on a GENERIC block pin (`ANY`, `ANY_NUM`, …) in a
    *  graphical editor: the pin doesn't dictate a type, so the user
    *  confirms name / class / type instead of the editor guessing
@@ -86,6 +89,12 @@ export type CreateGraphicalVariableModalData = {
    * dialog must not leave that behind.
    */
   onCancel?: () => void
+}
+
+/** Payload of `confirm-overwrite-project`. `onResolve` must be called exactly once, `false` on any dismissal. */
+export type ConfirmOverwriteProjectModalData = {
+  projectPath: string
+  onResolve: (overwrite: boolean) => void
 }
 
 export type ModalsState = Record<ModalTypes, { open: boolean; data: unknown }>

@@ -9,6 +9,10 @@
  *
  * It is not retrieval-specific. Any project can be written somewhere else, and
  * the retrieved case is simply the one where it is not optional.
+ *
+ * The destination may be an empty folder, or a folder holding an OpenPLC
+ * project, which is replaced after the user confirms. A folder holding anything
+ * else is refused.
  */
 
 import type { PlatformCapabilities } from '../../middleware/shared/ports/platform-capabilities'
@@ -17,6 +21,13 @@ import type { OpenPLCStore } from '../store'
 import { flushFlowWriteBacks } from '../store/slices/shared/flow-writeback'
 import { toast } from '../utils/toast'
 import { buildAllProjectFileContents, flushGlobalVariableListDrafts } from './save-actions'
+import {
+  classifySaveAsDestination,
+  computeOverwriteDeletions,
+  type ExistingDestination,
+  isOpenPlcProjectJson,
+  SAVE_AS_SCAN,
+} from './save-as-destination'
 
 export interface SaveProjectAsResult {
   success: boolean
@@ -41,7 +52,8 @@ export async function executeSaveProjectAs(
   projectPort: ProjectPort,
   _capabilities: PlatformCapabilities,
 ): Promise<SaveProjectAsResult> {
-  if (!projectPort.pickPath) {
+  const destination = await chooseDestination(projectPort)
+  if (destination.status === 'unavailable') {
     toast({
       title: 'Save As is not available here',
       description: 'This platform cannot choose a folder to save into.',
@@ -49,14 +61,24 @@ export async function executeSaveProjectAs(
     })
     return { success: false }
   }
-
-  const picked = await projectPort.pickPath()
-  if (!picked.success || !picked.path) {
+  if (destination.status === 'cancelled') {
     // Cancelling is an ordinary outcome and says nothing to the user.
-    if (picked.error) {
-      toast({ title: picked.error.title, description: picked.error.description, variant: 'fail' })
-      return { success: false }
-    }
+    return { success: false, cancelled: true }
+  }
+  if (destination.status === 'failed') {
+    toast({ title: destination.error.title, description: destination.error.description, variant: 'fail' })
+    return { success: false }
+  }
+
+  const destinationPath = destination.path
+  // `null` existing: the legacy picker only ever answers with an empty folder.
+  const existing = destination.existing
+  const kind = existing === null ? 'empty' : classifySaveAsDestination(existing.entries)
+  if (kind === 'foreign' || (kind === 'project' && !isOpenPlcProjectJson(existing?.files['project.json']))) {
+    toast(FOREIGN_FOLDER)
+    return { success: false }
+  }
+  if (kind === 'project' && !(await askToReplaceProject(store, destinationPath))) {
     return { success: false, cancelled: true }
   }
 
@@ -73,7 +95,7 @@ export async function executeSaveProjectAs(
   const contents = buildAllProjectFileContents(store)
 
   const files = {
-    projectPath: picked.path,
+    projectPath: destinationPath,
     projectJson: contents['project.json'] ?? '',
     deviceConfig: contents['devices/configuration.json'],
     pinMapping: contents['devices/pin-mapping.json'],
@@ -82,9 +104,9 @@ export async function executeSaveProjectAs(
     serverFiles: toEntries(contents, 'devices/servers/'),
     remoteDeviceFiles: toEntries(contents, 'devices/remote/'),
     dataTypeFiles: toEntries(contents, 'datatypes/'),
-    // Nothing to delete: this is a fresh destination, and carrying deletions
-    // from the old location would remove files there that were never copied.
-    deletions: [],
+    // Never the old location's pending deletions: they name files of a different folder. A replaced project gets
+    // its own list below.
+    deletions: [] as string[],
   }
 
   if (staleFlows.length > 0) {
@@ -99,6 +121,11 @@ export async function executeSaveProjectAs(
     return { success: false }
   }
 
+  if (kind === 'project' && existing !== null) {
+    // The editor loads every POU, data type and device file it finds, so the replaced project's leftovers go.
+    files.deletions = computeOverwriteDeletions(existing, files)
+  }
+
   const written = await projectPort.saveProject(files)
   if (!written.success) {
     toast({
@@ -111,7 +138,7 @@ export async function executeSaveProjectAs(
 
   // Adopt the new location only now. A project that has one is no longer
   // ephemeral, so an ordinary Save works from here on.
-  state.projectActions.updateMetaPath(picked.path)
+  state.projectActions.updateMetaPath(destinationPath)
   state.workspaceActions.setIsEphemeralProject(false)
   // And onto the recent list. Opening a project tracks it as a side effect of
   // reading it; this is the one flow that gives a project a location without a
@@ -123,17 +150,72 @@ export async function executeSaveProjectAs(
   // this point, so a bookkeeping failure must not cost the user the toast that
   // tells them the save worked. Both call sites use `void`, so a rejection here
   // would have been an unhandled one.
-  void projectPort.trackRecentProject?.(picked.path)?.catch(() => {
+  void projectPort.trackRecentProject?.(destinationPath)?.catch(() => {
     // Nothing to tell the user: the save succeeded, and the row reappears the
     // next time they open the project.
   })
 
   toast({
     title: 'Project saved',
-    description: `Saved to ${picked.path}.`,
+    description: `Saved to ${destinationPath}.`,
     variant: 'default',
   })
-  return { success: true, projectPath: picked.path }
+  return { success: true, projectPath: destinationPath }
+}
+
+const FOREIGN_FOLDER = {
+  title: 'Folder is not empty',
+  description:
+    'The selected folder has files that are not an OpenPLC project. Choose an empty folder or a folder with an OpenPLC project.',
+  variant: 'fail',
+} as const
+
+type Destination =
+  | { status: 'picked'; path: string; existing: (ExistingDestination & { entries: string[] }) | null }
+  | { status: 'cancelled' }
+  | { status: 'failed'; error: { title: string; description: string } }
+  | { status: 'unavailable' }
+
+/** The Save As picker when the platform has one, otherwise the new-project picker, which only accepts empty folders. */
+async function chooseDestination(projectPort: ProjectPort): Promise<Destination> {
+  if (projectPort.pickSaveAsPath) {
+    const picked = await projectPort.pickSaveAsPath(SAVE_AS_SCAN)
+    if (picked.success) {
+      return {
+        status: 'picked',
+        path: picked.path,
+        existing: { entries: picked.entries, files: picked.files, listed: picked.listed },
+      }
+    }
+    return 'error' in picked ? { status: 'failed', error: picked.error } : { status: 'cancelled' }
+  }
+  if (!projectPort.pickPath) return { status: 'unavailable' }
+
+  const picked = await projectPort.pickPath()
+  if (picked.success && picked.path) return { status: 'picked', path: picked.path, existing: null }
+  return picked.error ? { status: 'failed', error: picked.error } : { status: 'cancelled' }
+}
+
+/**
+ * Ask before replacing a project, and wait for the answer. A close from outside the dialog (another flow closing
+ * every modal) counts as a refusal, so the Save As never hangs.
+ */
+function askToReplaceProject(store: OpenPLCStore, projectPath: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false
+    let unsubscribe = (): void => {}
+    const settle = (overwrite: boolean): void => {
+      if (settled) return
+      settled = true
+      unsubscribe()
+      resolve(overwrite)
+    }
+    // Subscribed before opening, so a close in the same tick as the open is still seen.
+    unsubscribe = store.subscribe((state) => {
+      if (!state.modals['confirm-overwrite-project']?.open) settle(false)
+    })
+    store.getState().modalActions.openModal('confirm-overwrite-project', { projectPath, onResolve: settle })
+  })
 }
 
 /** The entries under one directory prefix, as the write shape expects. */

@@ -15,6 +15,7 @@ import type { ReactNode } from 'react'
 import type { DevicePort } from '../../../middleware/shared/ports/device-port'
 import { EDITOR_CAPABILITIES, type PlatformCapabilities } from '../../../middleware/shared/ports/platform-capabilities'
 import type { ProjectPort } from '../../../middleware/shared/ports/project-port'
+import type { RuntimePort } from '../../../middleware/shared/ports/runtime-port'
 import type { SystemPort } from '../../../middleware/shared/ports/system-port'
 import type { WindowPort } from '../../../middleware/shared/ports/window-port'
 import { PlatformProvider } from '../../../middleware/shared/providers'
@@ -42,12 +43,13 @@ let localOpens = 0
 const windowCalls: string[] = []
 
 let projectOverrides: Partial<ProjectPort> = {}
+let runtimeOverrides: Partial<RuntimePort> = {}
 let capabilities: PlatformCapabilities = EDITOR_CAPABILITIES
 
 function makePorts(): PlatformPorts {
   return {
     compiler: stubPort(),
-    runtime: stubPort(),
+    runtime: stubPort<RuntimePort>(runtimeOverrides),
     debugger: stubPort(),
     simulator: stubPort(),
     // The screen reads both lists on mount. The stub's `undefined` would be sorted as the
@@ -100,6 +102,7 @@ beforeEach(() => {
   windowCalls.length = 0
   localOpens = 0
   projectOverrides = {}
+  runtimeOverrides = {}
   capabilities = EDITOR_CAPABILITIES
 })
 
@@ -158,6 +161,40 @@ describe('the Open entry', () => {
 
     const edge = await screen.findByRole('menuitem', { name: /autonomy edge project/i })
     expect(edge.getAttribute('aria-disabled')).toBe('true')
+  })
+})
+
+/** Retrieving from a PLC no longer needs a project open first: the start screen offers it under Open. */
+describe('the Retrieve from PLC choice', () => {
+  it('is offered under Open, after the other two', async () => {
+    render(<StartScreen />, { wrapper: Wrapper })
+
+    await userEvent.click(await screen.findByRole('button', { name: /^open$/i }))
+
+    const items = (await screen.findAllByRole('menuitem')).map((item) => item.textContent?.trim() ?? '')
+    expect(items).toEqual(['Local project…', 'Autonomy Edge project…', 'Retrieve from PLC…'])
+  })
+
+  it('opens the retrieve dialog without opening or creating a project', async () => {
+    render(<StartScreen />, { wrapper: Wrapper })
+
+    await userEvent.click(await screen.findByRole('button', { name: /^open$/i }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: /retrieve from plc/i }))
+
+    expect(store.getState().modals['retrieve-project'].open).toBe(true)
+    expect(localOpens).toBe(0)
+    expect(store.getState().modals['create-project'].open).toBe(false)
+  })
+
+  it('greys out on a platform that cannot list devices', async () => {
+    // `undefined` on purpose: the stub would otherwise answer every name with a function.
+    runtimeOverrides = { listRetrievableDevices: undefined }
+    render(<StartScreen />, { wrapper: Wrapper })
+
+    await userEvent.click(await screen.findByRole('button', { name: /^open$/i }))
+
+    const retrieve = await screen.findByRole('menuitem', { name: /retrieve from plc/i })
+    expect(retrieve.getAttribute('aria-disabled')).toBe('true')
   })
 })
 

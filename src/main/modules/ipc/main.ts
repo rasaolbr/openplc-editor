@@ -98,9 +98,10 @@ import type {
   CloudFoldersResult,
   CloudProjectsResult,
   RawProjectFiles,
+  SaveAsPathPick,
   UploadProjectResult,
 } from '@root/middleware/shared/ports/project-port'
-import { WriteProjectFilesSchema } from '@root/middleware/shared/ports/project-port'
+import { SaveAsScanRequestSchema, WriteProjectFilesSchema } from '@root/middleware/shared/ports/project-port'
 import type {
   ListPublicLibrariesArgs,
   ListPublicLibrariesResponse,
@@ -160,6 +161,7 @@ import {
   getPlcopenExportSavePath,
   getPlcopenImportFilePath,
   getProjectPath,
+  getSaveAsProjectPath,
 } from '../../../backend/editor/utils'
 import { SimulatorModule } from '../../../backend/shared/simulator/simulator-module'
 import { VirtualSerialPort } from '../../../backend/shared/simulator/virtual-serial-port'
@@ -882,6 +884,7 @@ class MainProcessBridge implements MainIpcModule {
     this.registerHandle('project:open', this.handleProjectOpen)
     this.registerHandle('project:path-picker', this.handleProjectPathPicker)
     this.registerHandle('project:open-path-picker', this.handleOpenProjectPathPicker)
+    this.registerHandle('project:save-as-path-picker', this.handleSaveAsPathPicker)
     this.registerHandle('project:write-files', this.handleWriteProjectFiles)
     this.registerHandle('project:save-file', this.handleFileSave)
     this.registerHandle('project:open-by-path', this.handleProjectOpenByPath)
@@ -1110,6 +1113,23 @@ class MainProcessBridge implements MainIpcModule {
       logger.error('Window object not defined')
     } catch (error) {
       logger.error('Error getting project path: ' + getErrorMessage(error))
+    }
+  }
+  handleSaveAsPathPicker = async (_event: IpcMainInvokeEvent, scan: unknown): Promise<SaveAsPathPick> => {
+    const request = SaveAsScanRequestSchema.safeParse(scan)
+    if (!request.success) {
+      return { success: false, error: { title: 'Internal error', description: 'Invalid Save As request' } }
+    }
+    const windowManager = this.mainWindow
+    try {
+      if (windowManager) {
+        return await getSaveAsProjectPath(windowManager, request.data)
+      }
+      logger.error('Window object not defined')
+      return { success: false, error: { title: 'Internal error', description: 'Window object not defined' } }
+    } catch (error) {
+      logger.error('Error getting Save As path: ' + getErrorMessage(error))
+      return { success: false, error: { title: 'Internal error', description: getErrorMessage(error) } }
     }
   }
   handleOpenProjectPathPicker = async (_event: IpcMainInvokeEvent) => {

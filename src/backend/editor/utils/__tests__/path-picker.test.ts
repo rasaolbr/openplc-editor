@@ -6,9 +6,9 @@
  * are exercised against actual I/O rather than stubbed error shapes.
  */
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { basename, join } from 'path'
 
 const showOpenDialogMock = jest.fn()
 const showSaveDialogMock = jest.fn()
@@ -21,7 +21,13 @@ jest.mock('electron', () => ({
   },
 }))
 
-import { getPdfExportSavePath, getPlcopenExportSavePath, getPlcopenImportFilePath } from '../path-picker'
+import {
+  getPdfExportSavePath,
+  getPlcopenExportSavePath,
+  getPlcopenImportFilePath,
+  getProjectPath,
+  getSaveAsProjectPath,
+} from '../path-picker'
 
 describe('getPlcopenImportFilePath', () => {
   let dir: string
@@ -177,5 +183,108 @@ describe('getPdfExportSavePath', () => {
       success: false,
       error: { title: 'Error writing file', description: 'Failed to write the PDF file.' },
     })
+  })
+})
+
+describe('getSaveAsProjectPath', () => {
+  let dir: string
+  const scan = { readFiles: ['project.json', 'library.json'], listDirectories: ['pous/programs', 'datatypes'] }
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'save-as-'))
+    jest.clearAllMocks()
+  })
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('accepts an empty folder and reports nothing in it', async () => {
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: [dir] })
+
+    const result = await getSaveAsProjectPath({} as never, scan)
+
+    expect(showOpenDialogMock).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ properties: ['openDirectory', 'createDirectory'] }),
+    )
+    expect(result).toEqual({ success: true, path: dir, entries: [], files: {}, listed: [] })
+  })
+
+  it('accepts a folder that is not empty and reports what the scan asked for', async () => {
+    writeFileSync(join(dir, 'project.json'), '{"meta":{}}')
+    mkdirSync(join(dir, 'pous', 'programs', 'nested'), { recursive: true })
+    writeFileSync(join(dir, 'pous', 'programs', 'main.st'), '')
+    writeFileSync(join(dir, 'pous', 'programs', 'nested', 'deep.ld'), '')
+    mkdirSync(join(dir, 'other'))
+    writeFileSync(join(dir, 'other', 'ignored.st'), '')
+
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: [dir] })
+
+    const result = await getSaveAsProjectPath({} as never, scan)
+
+    if (!result.success) throw new Error('expected a pick')
+    expect([...result.entries].sort()).toEqual(['other', 'pous', 'project.json'])
+    // Only the requested files, and only those that exist.
+    expect(result.files).toEqual({ 'project.json': '{"meta":{}}' })
+    // Recursive, `/`-separated, and only under the requested directories.
+    expect([...result.listed].sort()).toEqual(['pous/programs/main.st', 'pous/programs/nested/deep.ld'])
+  })
+
+  it('never reads or lists outside the chosen folder', async () => {
+    const outside = mkdtempSync(join(tmpdir(), 'save-as-outside-'))
+    writeFileSync(join(outside, 'secret.txt'), 'secret')
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: [dir] })
+
+    const escape = `../${basename(outside)}`
+    const result = await getSaveAsProjectPath({} as never, {
+      readFiles: [`${escape}/secret.txt`],
+      listDirectories: [escape, '.'],
+    })
+    rmSync(outside, { recursive: true, force: true })
+
+    if (!result.success) throw new Error('expected a pick')
+    expect(result.files).toEqual({})
+    expect(result.listed).toEqual([])
+  })
+
+  it('reports a dismissed dialog as cancelled, not as an error', async () => {
+    showOpenDialogMock.mockResolvedValue({ canceled: true, filePaths: [] })
+
+    const result = await getSaveAsProjectPath({} as never, scan)
+
+    expect(result).toEqual({ success: false, cancelled: true })
+  })
+
+  it('returns an error when the folder cannot be read', async () => {
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: [join(dir, 'missing')] })
+
+    const result = await getSaveAsProjectPath({} as never, scan)
+
+    expect(result.success).toBe(false)
+    expect('error' in result && result.error.title).toBe('Folder could not be read')
+  })
+})
+
+describe('getProjectPath', () => {
+  let dir: string
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'new-project-'))
+    jest.clearAllMocks()
+  })
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('still refuses a folder that is not empty for a new project', async () => {
+    writeFileSync(join(dir, 'project.json'), '{}')
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: [dir] })
+
+    const result = await getProjectPath({} as never)
+
+    expect(result).toEqual(expect.objectContaining({ success: false }))
+    expect(result.error?.title).toBe('Directory is not empty')
   })
 })

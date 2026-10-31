@@ -29,6 +29,7 @@ const ALL_MODAL_TYPES: ModalTypes[] = [
   'confirm-install-libraries',
   'project-readme',
   'confirm-plcopen-import',
+  'confirm-overwrite-project',
   'create-graphical-variable',
   'export-pdf',
   'page-setup',
