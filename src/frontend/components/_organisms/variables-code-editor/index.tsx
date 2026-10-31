@@ -4,6 +4,10 @@ import * as monaco from 'monaco-editor'
 import { useEffect, useRef, useState } from 'react'
 
 import { pouVarsUri } from '../../../services/st-lsp/types'
+import {
+  installLineCommentKeybindings,
+  lineCommentKeybindings,
+} from '../../_features/[workspace]/editor/monaco/comment-keybindings'
 
 interface VariablesCodeEditorProps {
   code: string
@@ -78,8 +82,9 @@ const VariablesCodeEditor = ({
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [editorMounted, setEditorMounted] = useState(false)
 
-  const handleEditorDidMount: OnMount = (editor) => {
+  const handleEditorDidMount: OnMount = (editor, monacoInstance) => {
     editorRef.current = editor
+    installLineCommentKeybindings(editor, lineCommentKeybindings(monacoInstance))
     editor.layout()
     setEditorMounted(true)
   }
