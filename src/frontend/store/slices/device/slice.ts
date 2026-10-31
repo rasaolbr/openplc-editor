@@ -3,6 +3,11 @@ import { StateCreator } from 'zustand'
 
 import type { DeviceConfiguration, DevicePin } from '../../../../middleware/shared/ports/types'
 import { DEFAULT_RETAIN_FLUSH_SECONDS } from '../../../../middleware/shared/ports/types'
+import {
+  applyFixedPins,
+  type FixedPinDeclaration,
+  matchesFixedPins,
+} from '../../../../middleware/shared/utils/fixed-pins'
 import { DEVICE_SETUP_KEY, IO_MAPPING_KEY, MODULE_CONFIGURATION_KEY } from '../../../utils/vpp/persistence-keys'
 import { defaultDeviceConfiguration } from './data/types'
 import type { DeviceLicenseInfo, DeviceSlice, DeviceSliceRoot, PinUpdateResponse } from './types'
@@ -32,6 +37,36 @@ function getActivePinsDraft(draft: DeviceSlice): DevicePin[] {
     draft.deviceDefinitions.pinMapping.pinsByBoard[board] = []
   }
   return draft.deviceDefinitions.pinMapping.pinsByBoard[board]
+}
+
+/** The active board's fixed on-board I/O, when it declares any. */
+function activeFixedPins(draft: DeviceSlice): FixedPinDeclaration[] | undefined {
+  const board = draft.deviceDefinitions.configuration.deviceBoard
+  return draft.deviceAvailableOptions.availableBoards.get(board)?.pins?.fixed
+}
+
+/**
+ * Make the active board's pin bucket match its fixed on-board I/O.
+ *
+ * Called wherever the bucket or the board list can change under it — a board
+ * switch, a project load and the board list landing, in whichever order those
+ * arrive — so the table, the address registry and the saved file always carry
+ * the channels the runtime plugin drives, with the project's aliases. A no-op
+ * for every board that declares no fixed pins. Returns whether it wrote.
+ */
+function syncFixedPinsDraft(draft: DeviceSlice): boolean {
+  const fixed = activeFixedPins(draft)
+  if (!fixed) return false
+  const board = draft.deviceDefinitions.configuration.deviceBoard
+  const stored = draft.deviceDefinitions.pinMapping.pinsByBoard[board]
+  if (matchesFixedPins(stored, fixed)) return false
+  draft.deviceDefinitions.pinMapping.pinsByBoard[board] = applyFixedPins(stored, fixed)
+  return true
+}
+
+const FIXED_PIN_REJECTION = {
+  title: 'Fixed On-board I/O',
+  message: "This board's I/O is driven by its runtime plugin at fixed addresses. Only the alias can be changed.",
 }
 
 /**
@@ -142,6 +177,13 @@ const createDeviceSlice: StateCreator<DeviceSliceRoot, [], [], DeviceSlice> = (s
           }
         }),
       )
+      // The board list can land after the project did, and only then is it
+      // known whether the active board's I/O is fixed.
+      if (availableBoards) {
+        const pinsBefore = pinAddressSignature(getState())
+        setState(produce((draft: DeviceSlice) => void syncFixedPinsDraft(draft)))
+        recalcIfPinAddressesMoved(getState, pinsBefore)
+      }
 
       // Board discovery only affects target-capability resolution; it no
       // longer needs to touch program variables. In the single-field model a
@@ -152,7 +194,8 @@ const createDeviceSlice: StateCreator<DeviceSliceRoot, [], [], DeviceSlice> = (s
     },
     setDeviceDefinitions: ({ configuration, pinMapping }): void => {
       setState(
-        produce(({ deviceDefinitions, runtimeConnection }: DeviceSlice) => {
+        produce((draft: DeviceSlice) => {
+          const { deviceDefinitions, runtimeConnection } = draft
           if (configuration) {
             deviceDefinitions.configuration = mergeDeviceConfigWithDefaults(configuration, defaultDeviceConfiguration)
             if (deviceDefinitions.configuration.runtimeIpAddress) {
@@ -174,6 +217,9 @@ const createDeviceSlice: StateCreator<DeviceSliceRoot, [], [], DeviceSlice> = (s
             }
             deviceDefinitions.pinMapping.currentSelectedPinTableRow = -1
           }
+          // Before anything reads the pins: the alias repair and the address
+          // recalculation that follow a project load both do.
+          syncFixedPinsDraft(draft)
         }),
       )
     },
@@ -230,6 +276,7 @@ const createDeviceSlice: StateCreator<DeviceSliceRoot, [], [], DeviceSlice> = (s
       const pinsBefore = pinAddressSignature(getState())
       setState(
         produce((draft: DeviceSlice) => {
+          if (activeFixedPins(draft)) return
           draft.deviceUpdated.updated = true
           const pins = getActivePinsDraft(draft)
           const { pinMapping } = draft.deviceDefinitions
@@ -282,6 +329,7 @@ const createDeviceSlice: StateCreator<DeviceSliceRoot, [], [], DeviceSlice> = (s
       const pinsBefore = pinAddressSignature(getState())
       setState(
         produce((draft: DeviceSlice) => {
+          if (activeFixedPins(draft)) return
           draft.deviceUpdated.updated = true
           const pins = getActivePinsDraft(draft)
           const { pinMapping } = draft.deviceDefinitions
@@ -335,6 +383,13 @@ const createDeviceSlice: StateCreator<DeviceSliceRoot, [], [], DeviceSlice> = (s
             returnMessage.ok = false
             returnMessage.title = 'No Pin Selected'
             returnMessage.message = 'Please select a pin to update.'
+            return
+          }
+
+          if (activeFixedPins(draft) && ('pin' in updatedData || 'pinType' in updatedData)) {
+            returnMessage.ok = false
+            returnMessage.title = FIXED_PIN_REJECTION.title
+            returnMessage.message = FIXED_PIN_REJECTION.message
             return
           }
 
@@ -498,6 +553,9 @@ const createDeviceSlice: StateCreator<DeviceSliceRoot, [], [], DeviceSlice> = (s
           deviceDefinitions.configuration.deviceBoard = deviceBoard
         }),
       )
+      // Seed (or restore) the incoming board's fixed on-board I/O. Before the
+      // recalculation below, so the other producers pack around it.
+      setState(produce((draft: DeviceSlice) => void syncFixedPinsDraft(draft)))
       // Switching target changes which producer kinds are active — a board
       // without pin mapping / VPP frees those addresses. Recompute the
       // Modbus addresses project-wide so they reclaim the freed space, and

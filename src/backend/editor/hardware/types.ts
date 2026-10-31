@@ -39,6 +39,13 @@ const BoardInfoSchema = z.object({
   user_aout: z.string().optional(),
   user_din: z.string().optional(),
   user_dout: z.string().optional(),
+  // On-board channels a runtime plugin drives at fixed addresses. Loose here
+  // on purpose: `parseFixedPins` (middleware/shared/utils/fixed-pins) is the
+  // validator, and drops a bad entry instead of rejecting the whole file.
+  fixed_pins: z.array(z.unknown()).optional(),
+  // Per-board capability overrides, merged over the compiler preset by
+  // `resolveTargetCapabilities`. Typed at the use site.
+  capabilities: z.record(z.string(), z.unknown()).optional(),
   board_manager_url: z.string().optional(),
   extra_libraries: z.array(z.string()).optional(),
   define: z.string().or(z.array(z.string())).optional(),
@@ -77,6 +84,16 @@ const availableBoardsSchema = z.map(
       defaultAout: z.array(z.string()).optional(),
       defaultDin: z.array(z.string()).optional(),
       defaultDout: z.array(z.string()).optional(),
+      fixed: z
+        .array(
+          z.object({
+            pin: z.string(),
+            pinType: z.enum(['digitalInput', 'digitalOutput', 'analogInput', 'analogOutput']),
+            address: z.string(),
+            alias: z.string().optional(),
+          }),
+        )
+        .optional(),
     }),
     ...BoardInfoSchema.pick({ compiler: true, core: true, preview: true, specs: true }),
   }),

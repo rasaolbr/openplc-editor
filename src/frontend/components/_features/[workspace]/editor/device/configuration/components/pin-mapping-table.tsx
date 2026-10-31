@@ -39,6 +39,20 @@ const baseColumns = [
   }),
 ]
 
+/** Fixed on-board I/O: pin and type are the plugin's, shown as text. */
+const fixedColumns = [
+  columnHelper.accessor('pin', {
+    header: 'Pin',
+    cell: (props) => props.getValue(),
+  }),
+  columnHelper.accessor('pinType', {
+    header: 'Type',
+    cell: (props) => props.getValue(),
+  }),
+  baseColumns[2],
+  baseColumns[3],
+]
+
 const buildPullColumn = (pullSpec: PinPullSpec) =>
   columnHelper.accessor('pull', {
     header: 'Pull',
@@ -49,16 +63,21 @@ type PinMappingTableProps = {
   pins: DevicePin[]
   selectedRowId: number
   handleRowClick: (row: HTMLTableRowElement) => void
+  /** The board's on-board I/O is fixed: only the alias column is editable. */
+  fixed?: boolean
 }
 
-const PinMappingTable = ({ pins, selectedRowId, handleRowClick }: PinMappingTableProps) => {
+const PinMappingTable = ({ pins, selectedRowId, handleRowClick, fixed = false }: PinMappingTableProps) => {
   const store = useOpenPLCStoreApi()
   const updatePin = pinSelectors.useUpdatePin()
   const deviceBoard = boardSelectors.useDeviceBoard()
   const availableBoards = boardSelectors.useAvailableBoards()
   const pullSpec = availableBoards.get(deviceBoard)?.pins?.pull
 
-  const columns = useMemo(() => (pullSpec ? [...baseColumns, buildPullColumn(pullSpec)] : baseColumns), [pullSpec])
+  const columns = useMemo(() => {
+    const base = fixed ? fixedColumns : baseColumns
+    return pullSpec ? [...base, buildPullColumn(pullSpec)] : base
+  }, [pullSpec, fixed])
 
   const handleUpdateDataRequest = (_rowIndex: number, columnId: string, value: unknown) => {
     // Phase 1 — write-time alias-uniqueness gate (global, across all

@@ -149,5 +149,133 @@
         }
       ]
     }
+  },
+  "BLIIOT BL-370": {
+    "compiler": "openplc-compiler",
+    "preview": "generic.png",
+    "cxx_flags": [
+      "-std=gnu++17"
+    ],
+    "capabilities": {
+      "pinMapping": true,
+      "vppIo": false,
+      "modbusTcpRemote": true,
+      "ethercat": true,
+      "modbusTcpServer": true,
+      "opcuaServer": true,
+      "s7Server": true,
+      "debuggerTransports": [
+        "websocket"
+      ],
+      "pythonFunctionBlocks": true,
+      "arduinoApiCompletions": false,
+      "hasRuntimeStats": true,
+      "isInProcessSimulator": false,
+      "directUsbUpload": false
+    },
+    "fixed_pins": [
+      {
+        "pin": "DI1",
+        "pinType": "digitalInput",
+        "address": "%IX0.1"
+      },
+      {
+        "pin": "DI2",
+        "pinType": "digitalInput",
+        "address": "%IX0.2"
+      },
+      {
+        "pin": "DI3",
+        "pinType": "digitalInput",
+        "address": "%IX0.3"
+      },
+      {
+        "pin": "DI4",
+        "pinType": "digitalInput",
+        "address": "%IX0.4"
+      },
+      {
+        "pin": "DO1",
+        "pinType": "digitalOutput",
+        "address": "%QX0.1"
+      },
+      {
+        "pin": "DO2",
+        "pinType": "digitalOutput",
+        "address": "%QX0.2"
+      },
+      {
+        "pin": "DO3",
+        "pinType": "digitalOutput",
+        "address": "%QX0.3"
+      },
+      {
+        "pin": "DO4",
+        "pinType": "digitalOutput",
+        "address": "%QX0.4"
+      },
+      {
+        "pin": "AI1",
+        "pinType": "analogInput",
+        "address": "%IW17"
+      },
+      {
+        "pin": "AI2",
+        "pinType": "analogInput",
+        "address": "%IW18"
+      },
+      {
+        "pin": "AI3",
+        "pinType": "analogInput",
+        "address": "%IW19"
+      },
+      {
+        "pin": "AI4",
+        "pinType": "analogInput",
+        "address": "%IW20"
+      },
+      {
+        "pin": "AO1",
+        "pinType": "analogOutput",
+        "address": "%QW17"
+      },
+      {
+        "pin": "AO2",
+        "pinType": "analogOutput",
+        "address": "%QW18"
+      },
+      {
+        "pin": "AO3",
+        "pinType": "analogOutput",
+        "address": "%QW19"
+      },
+      {
+        "pin": "AO4",
+        "pinType": "analogOutput",
+        "address": "%QW20"
+      }
+    ],
+    "debug": {
+      "preconditions": [
+        "runtimeConnected",
+        "jwtToken"
+      ],
+      "channels": [
+        {
+          "label": "WebSocket",
+          "channel": "websocket",
+          "enabledWhen": true,
+          "params": {
+            "ipAddress": {
+              "$ref": "configuration.runtimeIpAddress"
+            },
+            "jwtToken": {
+              "$ref": "runtimeConnection.jwtToken",
+              "required": "JWT token missing. Reconnect to the runtime."
+            }
+          }
+        }
+      ]
+    }
   }
 }

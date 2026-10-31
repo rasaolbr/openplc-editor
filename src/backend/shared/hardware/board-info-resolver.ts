@@ -30,6 +30,7 @@ import type {
   PinPullSpec,
   PlatformOption,
 } from '../../../middleware/shared/ports/types'
+import { type FixedPinDeclaration, parseFixedPins } from '../../../middleware/shared/utils/fixed-pins'
 import { classifyBoardRuntime } from '../../../middleware/shared/utils/target-capabilities/runtime-kind'
 import type { TargetCapabilities } from '../../../middleware/shared/utils/target-capabilities/types'
 import { findVppDeviceByBoardName } from './find-vpp-device'
@@ -68,6 +69,9 @@ export interface HalsBoardEntry {
    *  for the schema.  Boards without a spec fall back to the
    *  "Debugging Not Available" outcome on the renderer side. */
   debug?: DebugSpec
+  /** On-board channels a runtime plugin drives at fixed addresses. Raw
+   *  here; `parseFixedPins` validates it. */
+  fixed_pins?: unknown
 }
 
 /**
@@ -235,6 +239,10 @@ export interface BoardBuildInfo {
   networkInterfaces?: string[]
   /** Per-pin pull-up/pull-down rules, from `defaults.pins.pull`. */
   pinPull?: PinPullSpec
+  /** On-board I/O a runtime plugin drives at fixed addresses, from hals.json
+   *  `fixed_pins`. When present it IS the pin mapping: the compile uses it in
+   *  place of whatever the project file carries. */
+  fixedPins?: FixedPinDeclaration[]
 
   // Debug-channel resolver spec --------------------------------------------
   /** Declarative debug spec consumed by `resolveDebugConnection`.
@@ -293,6 +301,8 @@ export class BoardInfoResolver {
     if (entry.max_data_size !== undefined) info.maxDataSize = entry.max_data_size
     if (entry.capabilities) info.capabilities = entry.capabilities
     if (entry.debug) info.debug = entry.debug
+    const fixedPins = parseFixedPins(entry.fixed_pins)
+    if (fixedPins) info.fixedPins = fixedPins
     return info
   }
 

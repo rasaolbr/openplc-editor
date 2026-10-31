@@ -5,9 +5,11 @@ import { join, resolve as pathResolve, sep as pathSep } from 'node:path'
 import { promisify } from 'node:util'
 
 import { app as electronApp } from 'electron'
-import { produce } from 'immer'
+import { castDraft, produce } from 'immer'
 import { SerialPort as NodeSerialPort } from 'serialport'
 
+import { parseFixedPins } from '../../../middleware/shared/utils/fixed-pins'
+import type { TargetCapabilities } from '../../../middleware/shared/utils/target-capabilities'
 import { readHalsFile } from '../../shared/firmware/hals-loader'
 import { type BoardBuildInfo, BoardInfoResolver } from '../../shared/hardware/board-info-resolver'
 import { resolveConfigTemplatePluginName } from '../../shared/utils/vpp/build-vpp-plugin-files'
@@ -245,6 +247,9 @@ class HardwareModule {
         boardData.core
       ]
 
+      const fixedPins = parseFixedPins(boardData.fixed_pins)
+      const halsCapabilities = boardData.capabilities as Partial<TargetCapabilities> | undefined
+
       availableBoards = produce(availableBoards, (draft) => {
         draft.set(board, {
           compiler: boardData.compiler,
@@ -274,7 +279,13 @@ class HardwareModule {
                 ?.split(',')
                 .map((pin) => pin.trim())
                 .filter(Boolean) ?? [],
+            ...(fixedPins ? { fixed: fixedPins } : {}),
           },
+          // A fixed-I/O board needs `pinMapping` on, which only its own
+          // capability block can say: the Runtime v4 preset has it off.
+          // Forwarded for those boards alone, so the built-in targets keep
+          // resolving from their compiler preset exactly as before.
+          ...(fixedPins && halsCapabilities ? { capabilities: castDraft(halsCapabilities) } : {}),
           ...(boardData.debug ? { debug: boardData.debug } : {}),
         })
       })

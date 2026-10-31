@@ -573,6 +573,7 @@ export function projectCapabilities(
 
 export type CompilerType = 'arduino-cli' | 'openplc-compiler' | 'simulator'
 
+import type { FixedPinDeclaration } from '../utils/fixed-pins'
 import type { DebuggerTransport, TargetCapabilities } from '../utils/target-capabilities'
 
 export type { DebuggerTransport, TargetCapabilities }
@@ -614,6 +615,10 @@ export interface BoardInfo {
     defaultDin?: string[]
     defaultDout?: string[]
     pull?: PinPullSpec
+    /** On-board channels a runtime plugin drives at fixed addresses (hals.json
+     *  `fixed_pins`). Present → the pin table carries exactly these and only
+     *  their aliases are editable. See `utils/fixed-pins`. */
+    fixed?: FixedPinDeclaration[]
   }
   /** When absent, the resolver in backend/shared infers capabilities from the legacy `compiler` field. */
   capabilities?: Partial<TargetCapabilities>

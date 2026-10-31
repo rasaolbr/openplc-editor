@@ -91,6 +91,7 @@ export function resolveBoardSelection(resolver: BoardInfoResolver, boardTarget: 
       ...(boardInfo.defaultSerial ? { defaultSerial: boardInfo.defaultSerial } : {}),
       ...(boardInfo.networkInterfaces ? { networkInterfaces: boardInfo.networkInterfaces } : {}),
       ...(boardInfo.pinPull ? { pinPull: boardInfo.pinPull } : {}),
+      ...(boardInfo.fixedPins ? { fixedPins: boardInfo.fixedPins } : {}),
       ...(boardInfo.source === 'vpp' ? { vpp: true } : {}),
       ...(boardInfo.capabilities ? { capabilities: boardInfo.capabilities } : {}),
     } as unknown as BoardHalsBuildEntry

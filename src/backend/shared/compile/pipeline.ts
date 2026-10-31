@@ -32,6 +32,7 @@ import type {
   RuntimeV4Bundle,
 } from '../../../middleware/shared/ports/compiler-platform-port'
 import type { StructuredCompileError } from '../../../middleware/shared/ports/types'
+import { applyFixedPins } from '../../../middleware/shared/utils/fixed-pins'
 import { composeRuntimeV4Bundle } from '../../../middleware/shared/utils/library/compose-runtime-v4-bundle'
 import { resolveModbusServerProfile } from '../../../middleware/shared/utils/modbus-server-profile'
 import {
@@ -145,6 +146,9 @@ export interface BoardHalsBuildEntry extends BoardHalsCompileEntry {
   networkInterfaces?: string[]
   /** The manifest's `defaults.pins.pull`, forwarded to `generateDefinesContent` for `PINPULL_DIN`. */
   pinPull?: import('../../../middleware/shared/ports/types').PinPullSpec
+  /** hals.json `fixed_pins`: on-board I/O a runtime plugin drives at fixed
+   *  addresses. Replaces `devicePinMapping` for the build when present. */
+  fixedPins?: import('../../../middleware/shared/utils/fixed-pins').FixedPinDeclaration[]
   /** Prebuilt arduino-hal (provisioning="prebuilt"): the precompiled Arduino
    *  library dir, linked via a 2nd `--library`. Present only for arduino
    *  prebuilt boards (the `source` HAL still compiles as the integration layer).
@@ -419,7 +423,7 @@ async function runCompilePipelineInner(
     boardTarget,
     boardRuntime,
     boardEntry,
-    devicePinMapping,
+    devicePinMapping: projectPinMapping,
     isSimulator,
     isRuntimeV4,
     isRuntimeV3,
@@ -440,6 +444,14 @@ async function runCompilePipelineInner(
     vendorScreenData,
     editorVersion,
   } = args
+
+  // A board with fixed on-board I/O carries exactly its declared channels,
+  // whatever the project file says: the addresses are the runtime plugin's,
+  // so a stale or hand-edited pin-mapping.json must not move them. The
+  // project's aliases are kept, so `AT DI1` still resolves.
+  const devicePinMapping = boardEntry.fixedPins
+    ? applyFixedPins(projectPinMapping, boardEntry.fixedPins)
+    : projectPinMapping
 
   // Resolve the board's effective capabilities from `boardEntry`.
   // Single source of truth — the same helper that gates the

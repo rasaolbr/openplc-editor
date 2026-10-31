@@ -78,6 +78,9 @@ const Board = memo(function () {
   // enable it via their preset; runtime-v4 GPIO boards (e.g. the Raspberry
   // Pi HAL) opt in with `capabilities.pinMapping` in their VPP manifest.
   const pinMappingEnabled = resolveTargetCapabilities(currentBoardInfo).pinMapping
+  // A board whose on-board I/O is driven by its runtime plugin at fixed
+  // addresses: the table lists those channels and only their aliases change.
+  const hasFixedPins = (currentBoardInfo?.pins?.fixed?.length ?? 0) > 0
 
   const runtimeIpAddress = useOpenPLCStore((state) => state.deviceDefinitions.configuration.runtimeIpAddress || '')
   // Read from the same place the connection resolver reads it, so the button and
@@ -924,26 +927,37 @@ const Board = memo(function () {
             <h2 id='slot-title' className='select-none text-lg font-medium text-neutral-950 dark:text-white'>
               Pin Mapping
             </h2>
-            <TableActions
-              className='w-fit *:rounded-md *:p-1'
-              actions={[
-                {
-                  ariaLabel: 'Add table row button',
-                  onClick: createNewPin,
-                  icon: <PlusIcon className='!stroke-brand' />,
-                  id: 'add-pin-button',
-                },
-                {
-                  ariaLabel: 'Remove table row button',
-                  onClick: removePin,
-                  disabled: currentSelectedPinTableRow === -1,
-                  icon: <MinusIcon className='!stroke-brand' />,
-                  id: 'remove-pin-button',
-                },
-              ]}
-            />
+            {hasFixedPins ? (
+              <span id='fixed-pins-note' className='select-none text-xs text-neutral-600 dark:text-neutral-400'>
+                On-board I/O at fixed addresses — only aliases can be edited
+              </span>
+            ) : (
+              <TableActions
+                className='w-fit *:rounded-md *:p-1'
+                actions={[
+                  {
+                    ariaLabel: 'Add table row button',
+                    onClick: createNewPin,
+                    icon: <PlusIcon className='!stroke-brand' />,
+                    id: 'add-pin-button',
+                  },
+                  {
+                    ariaLabel: 'Remove table row button',
+                    onClick: removePin,
+                    disabled: currentSelectedPinTableRow === -1,
+                    icon: <MinusIcon className='!stroke-brand' />,
+                    id: 'remove-pin-button',
+                  },
+                ]}
+              />
+            )}
           </div>
-          <PinMappingTable pins={pins} handleRowClick={handleRowClick} selectedRowId={currentSelectedPinTableRow} />
+          <PinMappingTable
+            pins={pins}
+            handleRowClick={handleRowClick}
+            selectedRowId={currentSelectedPinTableRow}
+            fixed={hasFixedPins}
+          />
         </div>
       )}
       <Modal open={showPythonWarning} onOpenChange={setShowPythonWarning}>
