@@ -3,6 +3,7 @@ import { StateCreator } from 'zustand'
 
 import type { DebugTreeNode, FbInstanceInfo, PlcLogs } from '../../../../middleware/shared/ports/types'
 import { isV4Logs, LOG_BUFFER_CAP } from '../../../../middleware/shared/ports/types'
+import { clampEditorFontSize, EDITOR_FONT_SIZE_DEFAULT } from '../../../utils/editor-zoom'
 import type { WorkspaceSlice } from './types'
 
 const createWorkspaceSlice: StateCreator<WorkspaceSlice, [], [], WorkspaceSlice> = (setState) => ({
@@ -16,6 +17,7 @@ const createWorkspaceSlice: StateCreator<WorkspaceSlice, [], [], WorkspaceSlice>
     },
     recent: [],
     isCollapsed: false,
+    editorFontSize: EDITOR_FONT_SIZE_DEFAULT,
     isModalOpen: [],
     discardChanges: false,
     selectedProjectTreeLeaf: {
@@ -117,6 +119,13 @@ const createWorkspaceSlice: StateCreator<WorkspaceSlice, [], [], WorkspaceSlice>
       setState(
         produce(({ workspace }: WorkspaceSlice) => {
           workspace.isCollapsed = !workspace.isCollapsed
+        }),
+      )
+    },
+    setEditorFontSize: (size) => {
+      setState(
+        produce(({ workspace }: WorkspaceSlice) => {
+          workspace.editorFontSize = clampEditorFontSize(size)
         }),
       )
     },

@@ -68,6 +68,8 @@ export type WorkspaceState = {
     systemConfigs: SystemConfigs
     recent: Array<{ lastOpenedAt: string; createdAt: string; path: string; name: string }>
     isCollapsed: boolean
+    /** Font size, in px, of the textual code editors; kept across project close. */
+    editorFontSize: number
     isModalOpen: Array<{ modalName: string; modalState: boolean }>
     discardChanges: boolean
     selectedProjectTreeLeaf: {
@@ -189,6 +191,7 @@ export type WorkspaceActions = {
   switchAppTheme: () => void
   toggleMaximizedWindow: () => void
   toggleCollapse: () => void
+  setEditorFontSize: (size: number) => void
   toggleDiscardChanges: () => void
   setModalOpen: (modalName: string, modalState: boolean) => void
   setSelectedProjectTreeLeaf: (leaf: { label: string; type: WorkspaceProjectTreeLeafType }) => void
