@@ -21,6 +21,7 @@ import { Modal, ModalContent, ModalTitle } from '../../../../_molecules/modal'
 import { toast } from '../../../[app]/toast/use-toast'
 import { renderDiffReview } from './ai-diff-review'
 import { type AiLspCoexistenceController, installAiLspCoexistenceKeybindings } from './ai-lsp-coexistence'
+import { installLineCommentKeybindings, lineCommentKeybindings } from './comment-keybindings'
 import {
   arduinoApiCompletion,
   cppSignatureHelp,
@@ -926,6 +927,8 @@ const MonacoEditor = (props: monacoEditorProps): ReturnType<typeof PrimitiveEdit
         },
       )
     }
+
+    installLineCommentKeybindings(editorInstance, lineCommentKeybindings(monacoInstance))
 
     // Tab commits visible AI ghost text; inert while AI is off (context key, see the effect below).
     coexistenceRef.current = installAiLspCoexistenceKeybindings(editorInstance, monacoInstance.KeyCode.Tab)
